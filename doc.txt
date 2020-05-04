@@ -1,0 +1,213 @@
+https://www.yoytang.com/go-gin-doc.html
+https://github.com/skyhee/gin-doc-cn
+https://segmentfault.com/a/1190000013297683
+
+
+    router.GET("/someGet", getting)
+    router.POST("/somePost", posting)
+    router.PUT("/somePut", putting)
+    router.DELETE("/someDelete", deleting)
+    router.PATCH("/somePatch", patching)
+    router.HEAD("/someHead", head)
+    router.OPTIONS("/someOptions", options)
+
+
+// 这个处理器可以匹配 /user/john ， 但是它不会匹配 /user
+router.GET("/user/:name", func(c *gin.Context) {
+name := c.Param("name")
+c.String(http.StatusOK, "Hello %s", name)
+})
+
+// 但是，这个可以匹配 /user/john 和 /user/john/send
+// 如果没有其他的路由匹配 /user/john ， 它将重定向到 /user/john/
+router.GET("/user/:name/*action", func(c *gin.Context) {
+name := c.Param("name")
+action := c.Param("action")
+message := name + " is " + action
+c.String(http.StatusOK, message)
+})
+
+engine.Any("/", WebRoot)
+
+
+ // 简单组： v1
+    v1 := router.Group("/v1")
+    {
+        v1.POST("/login", loginEndpoint)
+        v1.POST("/submit", submitEndpoint)
+        v1.POST("/read", readEndpoint)
+    }
+
+    // 简单组： v2
+    v2 := router.Group("/v2")
+    {
+        v2.POST("/login", loginEndpoint)
+        v2.POST("/submit", submitEndpoint)
+        v2.POST("/read", readEndpoint)
+    }
+
+
+
+默认的没有中间件的空白 Gin
+Use
+
+r := gin.New()
+代替
+
+// Default 已经连接了 Logger 和 Recovery 中间件
+r := gin.Default()
+
+
+// 从 JSON 绑定
+type Login struct {
+    User     string `form:"user" json:"user" binding:"required"`
+    Password string `form:"password" json:"password" binding:"required"`
+}
+
+// 省略的代码 ...
+
+func main() {
+    router := gin.Default()
+
+    // 注册一个路由，使用了 middleware1，middleware2 两个中间件
+    router.GET("/someGet", middleware1, middleware2, handler)
+
+    // 默认绑定 :8080
+    router.Run()
+}
+
+func handler(c *gin.Context) {
+    log.Println("exec handler")
+}
+
+
+
+推荐使用 fileboy 来热更新代码，提高编码效率。
+
+实际上你只需要对 gin.Context 这个结构有深刻认识，就可以使用 Gin 流畅的编写代码了。
+
+
+
+路由组使用中间件
+路由组使用中间件和单个路由类似，只不过是要把中间件放到 Group 上.
+
+// 省略的代码 ...
+
+func main() {
+    router := gin.Default()
+
+    // 定义一个组前缀, 并使用 middleware1 中间件
+  	// 访问 /v2/login 就会执行 middleware1 函数
+    v2 := router.Group("/v2", middleware1)
+    v2.POST("/login", loginEndpoint)
+    v2.POST("/submit", submitEndpoint)
+    v2.POST("/read", readEndpoint)
+
+    router.Run(":8080")
+}
+
+// 省略的代码 ...
+
+
+
+其他格式的数据
+一些复杂的场景下，如用户直接 POST一段 json字符串到应用中，我们需要获取原始数据，这时需要用 c.GetRawData来获取原始字节。
+
+// 省略的代码 ...
+
+func main() {
+    router := gin.Default()
+
+    router.POST("/post", func(c *gin.Context) {
+        // 获取原始字节
+        d, err := c.GetRawData()
+        if err!=nil {
+            log.Fatalln(err)
+        }
+        log.Println(string(d))
+        c.String(200, "ok")
+    })
+    router.Run(":8080")
+}
+
+
+
+在控制器中,,,定义个查询参数
+
+
+绑定url查询参数和POST参数
+使用 c.ShouldBind方法，可以将参数自动绑定到 struct.该方法是会检查 Url 查询字符串和 POST 的数据，而且会根据 content-type类型，优先匹配JSON或者 XML,之后才是 Form. 有关详情查阅 这里
+
+package main
+
+import "log"
+import "github.com/gin-gonic/gin"
+import "time"
+
+// 定义一个 Person 结构体，用来绑定数据
+type Person struct {
+    Name     string    `form:"name"`
+    Address  string    `form:"address"`
+    Birthday time.Time `form:"birthday" time_format:"2006-01-02" time_utc:"1"`
+}
+
+func main() {
+    route := gin.Default()
+    route.GET("/testing", startPage)
+    route.Run(":8085")
+}
+
+func startPage(c *gin.Context) {
+    var person Person
+    // 绑定到 person
+    if c.ShouldBind(&person) == nil {
+        log.Println(person.Name)
+        log.Println(person.Address)
+        log.Println(person.Birthday)
+    }
+
+    c.String(200, "Success")
+}
+
+
+
+3.HTTP 服务器替换方案 想无缝重启、停机吗? 以下有几种方式
+
+
+router.POST("/login", func(c *gin.Context) {
+        var user User
+        var err error
+        contentType := c.Request.Header.Get("Content-Type")
+
+        switch contentType {
+        case "application/json":
+            err = c.BindJSON(&user)
+        case "application/x-www-form-urlencoded":
+            err = c.BindWith(&user, binding.Form)
+        }
+
+        if err != nil {
+            fmt.Println(err)
+            log.Fatal(err)
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "user":   user.Username,
+            "passwd": user.Passwd,
+            "age":    user.Age,
+        })
+
+    })
+
+
+
+ 重定向
+ gin对于重定向的请求，相当简单。调用上下文的Redirect方法：
+
+     router.GET("/redict/google", func(c *gin.Context) {
+         c.Redirect(http.StatusMovedPermanently, "https://google.com")
+     })
+
+
+
+hprose 中 如果是go作为客户端,那么 客户端和服务端参数类型必须一样
